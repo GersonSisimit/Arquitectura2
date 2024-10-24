@@ -18,6 +18,12 @@ namespace ProyectoSemaforos.Controllers
         [HttpPost]
         public IActionResult IngresarVehiculos(int cantidad)
         {
+            // Validación de entrada
+            if (cantidad <= 0)
+            {
+                return Json(new { success = false, message = "La cantidad debe ser un número positivo." });
+            }
+
             int ingresados = 0;
 
             for (int i = 0; i < cantidad; i++)
@@ -46,23 +52,26 @@ namespace ProyectoSemaforos.Controllers
         [HttpPost]
         public IActionResult SacarVehiculos(int cantidad)
         {
+            // Validación de entrada
+            if (cantidad <= 0)
+            {
+                return Json(new { success = false, message = "La cantidad debe ser un número positivo." });
+            }
+
             if (cantidad > estacionados)
             {
-                return Json(new { success = false, message = "No hay suficientes vehículos estacionados." });
+                return Json(new { success = false, message = $"No se pueden retirar más de {estacionados} vehículos." });
             }
 
             estacionados -= cantidad; // Restar vehículos estacionados
 
             // Verificar si hay vehículos en espera
-            if (espera.Count > 0)
+            for (int i = 0; i < cantidad; i++)
             {
-                for (int i = 0; i < cantidad; i++)
+                if (espera.Count > 0)
                 {
-                    if (espera.Count > 0)
-                    {
-                        espera.Dequeue(); // Retirar de la espera
-                        estacionados++; // Incrementar el número de estacionados
-                    }
+                    espera.Dequeue(); // Retirar de la espera
+                    estacionados++; // Incrementar el número de estacionados
                 }
             }
 

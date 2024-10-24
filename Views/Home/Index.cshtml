@@ -65,6 +65,12 @@
     function ingresarVehiculos() {
         const cantidad = parseInt($('#cantidadIngresar').val());
 
+        // Validar si el input es un número válido
+        if (isNaN(cantidad) || cantidad <= 0) {
+            mostrarResultado({ success: false, message: "La cantidad debe ser un número positivo." });
+            return;
+        }
+
         $.ajax({
             url: '@Url.Action("IngresarVehiculos", "Home")',
             type: 'POST',
@@ -80,6 +86,12 @@
 
     function sacarVehiculos() {
         const cantidad = parseInt($('#cantidadSacar').val());
+
+        // Validar si el input es un número válido
+        if (isNaN(cantidad) || cantidad <= 0) {
+            mostrarResultado({ success: false, message: "La cantidad debe ser un número positivo." });
+            return;
+        }
 
         $.ajax({
             url: '@Url.Action("SacarVehiculos", "Home")',
@@ -98,7 +110,8 @@
         $('#estacionados').text(response.estacionados);
         $('#enEspera').text(response.enEspera);
 
-        const disponibles = @ViewBag.CapacidadMaxima - response.estacionados;
+        // Calcular espacios disponibles y evitar NaN
+        const disponibles = Math.max(0, @ViewBag.CapacidadMaxima - response.estacionados);
         $('#disponibles').text(disponibles);
 
         // Animación simple de actualización con color
