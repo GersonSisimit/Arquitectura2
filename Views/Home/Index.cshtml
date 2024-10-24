@@ -1,0 +1,64 @@
+﻿@{
+    ViewData["Title"] = "Estacionamiento";
+}
+
+<div class="container mt-5">
+    <h2>Estacionamiento</h2>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <h4>Ingresar Vehículos</h4>
+            <input type="number" id="cantidadIngresar" class="form-control" placeholder="Cantidad de vehículos" min="1" />
+            <button class="btn btn-primary mt-2" onclick="ingresarVehiculos()">Ingresar</button>
+        </div>
+
+        <div class="col-md-6">
+            <h4>Sacar Vehículos</h4>
+            <input type="number" id="cantidadSacar" class="form-control" placeholder="Cantidad de vehículos" min="1" />
+            <button class="btn btn-danger mt-2" onclick="sacarVehiculos()">Sacar</button>
+        </div>
+    </div>
+
+    <div class="mt-5" id="resultado"></div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+    function ingresarVehiculos() {
+        const cantidad = parseInt($('#cantidadIngresar').val());
+
+        $.ajax({
+            url: '@Url.Action("IngresarVehiculos", "Home")',
+            type: 'POST',
+            data: { cantidad: cantidad },
+            success: function (response) {
+                mostrarResultado(response);
+            },
+            error: function () {
+                mostrarResultado({ success: false, message: 'Error al ingresar los vehículos.' });
+            }
+        });
+    }
+
+    function sacarVehiculos() {
+        const cantidad = parseInt($('#cantidadSacar').val());
+
+        $.ajax({
+            url: '@Url.Action("SacarVehiculos", "Home")',
+            type: 'POST',
+            data: { cantidad: cantidad },
+            success: function (response) {
+                mostrarResultado(response);
+            },
+            error: function () {
+                mostrarResultado({ success: false, message: 'Error al sacar los vehículos.' });
+            }
+        });
+    }
+
+    function mostrarResultado(response) {
+        const color = response.success ? 'green' : 'red';
+        $('#resultado').html(`<p style="color:${color}">${response.message}</p>`);
+    }
+</script>
