@@ -19,7 +19,12 @@
         </div>
     </div>
 
-    <div class="mt-5" id="resultado"></div>
+    <div class="mt-5">
+        <h4>Estado del Estacionamiento</h4>
+        <p><strong>Vehículos Estacionados:</strong> <span id="estacionados">0</span></p>
+        <p><strong>Vehículos en Espera:</strong> <span id="enEspera">0</span></p>
+        <div id="resultado"></div>
+    </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -33,10 +38,10 @@
             type: 'POST',
             data: { cantidad: cantidad },
             success: function (response) {
-                mostrarResultado(response);
+                actualizarEstado(response);
             },
             error: function () {
-                mostrarResultado({ success: false, message: 'Error al ingresar los vehículos.' });
+                mostrarResultado({ success: false, message: 'Error al ingresar vehículos.' });
             }
         });
     }
@@ -49,12 +54,18 @@
             type: 'POST',
             data: { cantidad: cantidad },
             success: function (response) {
-                mostrarResultado(response);
+                actualizarEstado(response);
             },
             error: function () {
-                mostrarResultado({ success: false, message: 'Error al sacar los vehículos.' });
+                mostrarResultado({ success: false, message: 'Error al sacar vehículos.' });
             }
         });
+    }
+
+    function actualizarEstado(response) {
+        $('#estacionados').text(response.estacionados);
+        $('#enEspera').text(response.enEspera);
+        mostrarResultado(response);
     }
 
     function mostrarResultado(response) {
