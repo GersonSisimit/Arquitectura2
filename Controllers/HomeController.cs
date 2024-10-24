@@ -1,89 +1,72 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
-using System.Threading;
 
 namespace ProyectoSemaforos.Controllers
 {
     public class HomeController : Controller
     {
-        private static int _capacidadMaxima = 5; // Espacios máximos disponibles en el estacionamiento
-        private static List<string> _vehiculosEstacionados = new(); // Vehículos dentro del estacionamiento
-        private static Queue<string> _vehiculosEnEspera = new(); // Vehículos en espera
-        private static Semaphore _semaforo = new(_capacidadMaxima, _capacidadMaxima); // Controla el acceso con semáforos
-        private static object _lock = new(); // Asegura la concurrencia
+        public static int CapacidadMaxima = 5; // Capacidad total del estacionamiento
+        private static int estacionados = 0; // Vehículos estacionados
+        private static Queue<int> espera = new(); // Vehículos en espera
 
-        public IActionResult Index() => View();
-
-        [HttpPost]
-        public JsonResult IngresarVehiculos(int cantidad)
+        public IActionResult Index()
         {
-            lock (_lock)
-            {
-                int ingresados = 0;
-
-                for (int i = 0; i < cantidad; i++)
-                {
-                    if (_semaforo.WaitOne(0)) // Si hay espacio disponible
-                    {
-                        _vehiculosEstacionados.Add($"Vehículo-{_vehiculosEstacionados.Count + 1}");
-                        ingresados++;
-                    }
-                    else
-                    {
-                        _vehiculosEnEspera.Enqueue($"Vehículo-{_vehiculosEstacionados.Count + i + 1}");
-                    }
-                }
-
-                string mensaje = ingresados > 0
-                    ? $"{ingresados} vehículos ingresaron. {cantidad - ingresados} en espera."
-                    : "Todos los vehículos están en espera.";
-
-                return Json(new
-                {
-                    success = true,
-                    estacionados = _vehiculosEstacionados.Count,
-                    enEspera = _vehiculosEnEspera.Count,
-                    message = mensaje
-                });
-            }
+            ViewBag.CapacidadMaxima = CapacidadMaxima; // Pasar capacidad a la vista
+            return View();
         }
 
         [HttpPost]
-        public JsonResult SacarVehiculos(int cantidad)
+        public IActionResult IngresarVehiculos(int cantidad)
         {
-            lock (_lock)
-            {
-                int eliminados = 0;
+            int ingresados = 0;
 
+            for (int i = 0; i < cantidad; i++)
+            {
+                if (estacionados < CapacidadMaxima)
+                {
+                    estacionados++;
+                    ingresados++;
+                }
+                else
+                {
+                    espera.Enqueue(1); // Agregar a la cola de espera
+                }
+            }
+
+            // Verificar si hay vehículos en espera
+            if (espera.Count > 0 && estacionados < CapacidadMaxima)
+            {
+                espera.Dequeue(); // Retirar de la espera
+                estacionados++; // Incrementar el número de estacionados
+            }
+
+            return Json(new { success = true, message = $"{ingresados} vehículos ingresados.", estacionados, enEspera = espera.Count });
+        }
+
+        [HttpPost]
+        public IActionResult SacarVehiculos(int cantidad)
+        {
+            if (cantidad > estacionados)
+            {
+                return Json(new { success = false, message = "No hay suficientes vehículos estacionados." });
+            }
+
+            estacionados -= cantidad; // Restar vehículos estacionados
+
+            // Verificar si hay vehículos en espera
+            if (espera.Count > 0)
+            {
                 for (int i = 0; i < cantidad; i++)
                 {
-                    if (_vehiculosEstacionados.Count > 0)
+                    if (espera.Count > 0)
                     {
-                        _vehiculosEstacionados.RemoveAt(0);
-                        _semaforo.Release(); // Libera un espacio
-                        eliminados++;
-
-                        // Si hay vehículos en espera, ingrésalos
-                        if (_vehiculosEnEspera.Count > 0 && _semaforo.WaitOne(0))
-                        {
-                            string vehiculoEnEspera = _vehiculosEnEspera.Dequeue();
-                            _vehiculosEstacionados.Add(vehiculoEnEspera);
-                        }
+                        espera.Dequeue(); // Retirar de la espera
+                        estacionados++; // Incrementar el número de estacionados
                     }
                 }
-
-                string mensaje = eliminados > 0
-                    ? $"{eliminados} vehículos salieron. {cantidad - eliminados} no se encontraron."
-                    : "No hay vehículos disponibles para sacar.";
-
-                return Json(new
-                {
-                    success = true,
-                    estacionados = _vehiculosEstacionados.Count,
-                    enEspera = _vehiculosEnEspera.Count,
-                    message = mensaje
-                });
             }
+
+            return Json(new { success = true, message = $"{cantidad} vehículos retirados.", estacionados, enEspera = espera.Count });
         }
     }
 }
