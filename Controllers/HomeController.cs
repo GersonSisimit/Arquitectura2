@@ -1,91 +1,91 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace ProyectoSemaforos.Controllers
+namespace ProyectoParqueo.Controllers
 {
     public class HomeController : Controller
     {
-        public static int CapacidadMaxima = 5; // Capacidad total del estacionamiento
-        private static int estacionados = 0; // Vehículos estacionados
-        private static Queue<int> espera = new(); // Vehículos en espera
-        private static SemaphoreSlim semaphore = new SemaphoreSlim(CapacidadMaxima); // Semáforo
+        // Parámetros del estacionamiento
+        private static int _parkingSpaces = 10; // Número total de espacios de estacionamiento
+        private static int _occupiedSpaces = 0; // Espacios actualmente ocupados
+        private static ConcurrentQueue<int> _waitingVehicles = new ConcurrentQueue<int>(); // Cola de vehículos en espera
+        private static SemaphoreSlim _semaphore = new SemaphoreSlim(_parkingSpaces, _parkingSpaces); // Semáforo para controlar el acceso
+        private static int _vehicleIdCounter = 0; // Contador para identificar vehículos únicos
 
-       //Grupo 6 marlon
+        // Lista de hilos activos
+        private static List<Thread> _vehicleThreads = new List<Thread>();
 
+        // Objeto para sincronización
+        private static object _lock = new object();
+
+        // Página principal
         public IActionResult Index()
         {
-            ViewBag.CapacidadMaxima = CapacidadMaxima; // Pasar capacidad a la vista
+            ViewBag.TotalSpaces = _parkingSpaces;
+            ViewBag.OccupiedSpaces = _occupiedSpaces;
             return View();
         }
 
+        // Acción para agregar vehículos
         [HttpPost]
-        public IActionResult IngresarVehiculos(int cantidad)
+        public JsonResult AddVehicles(int vehicleCount)
         {
-            // Validación de entrada
-            if (cantidad <= 0)
+            for (int i = 0; i < vehicleCount; i++)
             {
-                return Json(new { success = false, message = "La cantidad debe ser un número positivo." });
-            }
+                int vehicleId = Interlocked.Increment(ref _vehicleIdCounter);
+                _waitingVehicles.Enqueue(vehicleId);
 
-            int ingresados = 0;
+                Thread vehicleThread = new Thread(() => ManageParking(vehicleId));
+                vehicleThread.Start();
 
-            for (int i = 0; i < cantidad; i++)
-            {
-                if (semaphore.Wait(0)) // Intenta adquirir el semáforo
+                lock (_lock)
                 {
-                    estacionados++;
-                    ingresados++;
-                }
-                else
-                {
-                    espera.Enqueue(1); // Agregar a la cola de espera
+                    _vehicleThreads.Add(vehicleThread);
                 }
             }
 
-            // Verificar si hay vehículos en espera
-            while (espera.Count > 0 && estacionados < CapacidadMaxima)
-            {
-                espera.Dequeue(); // Retirar de la espera
-                estacionados++; // Incrementar el número de estacionados
-            }
-
-            return Json(new { success = true, message = $"{ingresados} vehículos ingresados.", estacionados, enEspera = espera.Count });
+            return Json(new { success = true, message = $"{vehicleCount} vehículos han intentado ingresar." });
         }
 
-        [HttpPost]
-        public IActionResult SacarVehiculos(int cantidad)
+        // Método para gestionar el ingreso de vehículos al estacionamiento
+        private void ManageParking(int vehicleId)
         {
-            // Validación de entrada
-            if (cantidad <= 0)
-            {
-                return Json(new { success = false, message = "La cantidad debe ser un número positivo." });
-            }
+            // Intentar entrar al estacionamiento
+            _semaphore.Wait();
 
-            if (cantidad > estacionados)
-            {
-                return Json(new { success = false, message = $"No se pueden retirar más de {estacionados} vehículos." });
-            }
+            // Remover de la cola de espera
+            int dequeuedVehicleId;
+            _waitingVehicles.TryDequeue(out dequeuedVehicleId);
 
-            // Liberar el semáforo por cada vehículo que sale
-            for (int i = 0; i < cantidad; i++)
-            {
-                estacionados--; // Restar vehículos estacionados
-                semaphore.Release(); // Liberar un espacio en el semáforo
-            }
+            Interlocked.Increment(ref _occupiedSpaces);
 
-            // Verificar si hay vehículos en espera
-            for (int i = 0; i < cantidad; i++)
-            {
-                if (espera.Count > 0)
-                {
-                    espera.Dequeue(); // Retirar de la espera
-                    estacionados++; // Incrementar el número de estacionados
-                    semaphore.Wait(); // Esperar por un espacio
-                }
-            }
+            // Simular el tiempo que el vehículo está estacionado
+            Thread.Sleep(3000); // Esperar 3 segundos
 
-            return Json(new { success = true, message = $"{cantidad} vehículos retirados.", estacionados, enEspera = espera.Count });
+            // Salir del estacionamiento
+            Interlocked.Decrement(ref _occupiedSpaces);
+            _semaphore.Release();
+
+            // Remover el hilo de la lista de hilos activos
+            lock (_lock)
+            {
+                _vehicleThreads.Remove(Thread.CurrentThread);
+            }
+        }
+
+        // Acción para obtener el estado del estacionamiento
+        [HttpGet]
+        public JsonResult GetParkingStatus()
+        {
+            return Json(new
+            {
+                totalSpaces = _parkingSpaces,
+                occupiedSpaces = _occupiedSpaces,
+                waitingVehicles = _waitingVehicles.Count,
+                threadCount = _vehicleThreads.Count
+            });
         }
     }
 }
