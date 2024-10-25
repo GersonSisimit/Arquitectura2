@@ -11,7 +11,7 @@ namespace ProyectoSemaforos.Controllers
         private static Queue<int> espera = new(); // Vehículos en espera
         private static SemaphoreSlim semaphore = new SemaphoreSlim(CapacidadMaxima); // Semáforo
 
-       //Grupo 6
+       //Grupo 6 wudy
 
         public IActionResult Index()
         {
