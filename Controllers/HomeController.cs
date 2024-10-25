@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace ProyectoSemaforos.Controllers
 {
@@ -8,6 +9,7 @@ namespace ProyectoSemaforos.Controllers
         public static int CapacidadMaxima = 5; // Capacidad total del estacionamiento
         private static int estacionados = 0; // Vehículos estacionados
         private static Queue<int> espera = new(); // Vehículos en espera
+        private static SemaphoreSlim semaphore = new SemaphoreSlim(CapacidadMaxima); // Semáforo
 
         public IActionResult Index()
         {
@@ -28,7 +30,7 @@ namespace ProyectoSemaforos.Controllers
 
             for (int i = 0; i < cantidad; i++)
             {
-                if (estacionados < CapacidadMaxima)
+                if (semaphore.Wait(0)) // Intenta adquirir el semáforo
                 {
                     estacionados++;
                     ingresados++;
@@ -40,7 +42,7 @@ namespace ProyectoSemaforos.Controllers
             }
 
             // Verificar si hay vehículos en espera
-            if (espera.Count > 0 && estacionados < CapacidadMaxima)
+            while (espera.Count > 0 && estacionados < CapacidadMaxima)
             {
                 espera.Dequeue(); // Retirar de la espera
                 estacionados++; // Incrementar el número de estacionados
@@ -63,7 +65,12 @@ namespace ProyectoSemaforos.Controllers
                 return Json(new { success = false, message = $"No se pueden retirar más de {estacionados} vehículos." });
             }
 
-            estacionados -= cantidad; // Restar vehículos estacionados
+            // Liberar el semáforo por cada vehículo que sale
+            for (int i = 0; i < cantidad; i++)
+            {
+                estacionados--; // Restar vehículos estacionados
+                semaphore.Release(); // Liberar un espacio en el semáforo
+            }
 
             // Verificar si hay vehículos en espera
             for (int i = 0; i < cantidad; i++)
@@ -72,6 +79,7 @@ namespace ProyectoSemaforos.Controllers
                 {
                     espera.Dequeue(); // Retirar de la espera
                     estacionados++; // Incrementar el número de estacionados
+                    semaphore.Wait(); // Esperar por un espacio
                 }
             }
 
